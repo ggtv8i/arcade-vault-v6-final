@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>PC Engine / TurboGrafx-16 — Arcade Vault</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;background:#000;overflow:hidden;
+  font-family:system-ui,-apple-system,'Segoe UI',sans-serif}
+
+/* Shell */
+#shell{width:100%;height:100%;display:flex;flex-direction:column}
+
+/* Top bar */
+.bar{height:42px;flex-shrink:0;background:rgba(4,4,18,.98);
+  border-bottom:1px solid rgba(255,255,255,.06);
+  display:flex;align-items:center;padding:0 10px;gap:7px;z-index:10}
+.back{width:32px;height:32px;border-radius:7px;background:rgba(255,255,255,.07);
+  border:1px solid rgba(255,255,255,.08);color:#fff;font-size:18px;
+  cursor:pointer;display:grid;place-items:center;text-decoration:none;
+  transition:background .15s;flex-shrink:0}
+.back:hover{background:rgba(255,255,255,.15)}
+.info{flex:1;min-width:0;text-align:center}
+.info-name{font-family:'Courier New',monospace;font-size:11px;font-weight:700;
+  color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.info-sys{font-size:8px;color:#444;letter-spacing:1.5px}
+.btns{display:flex;gap:3px;flex-shrink:0}
+.btn{height:28px;padding:0 9px;border-radius:6px;background:rgba(255,255,255,.07);
+  border:1px solid rgba(255,255,255,.08);color:#fff;font-size:11px;font-weight:600;
+  cursor:pointer;transition:all .15s;white-space:nowrap}
+.btn:hover{background:rgba(136,0,255,.3);border-color:#8800ff}
+.btn.ok{background:rgba(0,255,170,.1);border-color:rgba(0,255,170,.35);color:#00ffaa}
+.as-ind{display:flex;align-items:center;gap:3px;font-family:monospace;
+  font-size:7px;letter-spacing:1px;color:#333;flex-shrink:0;transition:color .25s}
+.as-ind.on{color:#00ffaa}
+.as-dot{width:5px;height:5px;border-radius:50%;background:currentColor}
+.as-ind.on .as-dot{animation:blink 1.5s ease infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+
+/* Game area */
+#gameArea{flex:1;position:relative;overflow:hidden;background:#000}
+#game{width:100%;height:100%;border:none}
+
+/* Loader overlay */
+#loader{position:absolute;inset:0;z-index:20;background:#07071c;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:12px;padding:20px;transition:opacity .5s ease}
+#loader.gone{opacity:0;pointer-events:none}
+.ld-ico{font-size:50px;animation:bob 2s ease-in-out infinite}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
+.ld-name{font-family:'Courier New',monospace;font-size:14px;font-weight:700;
+  color:#fff;text-align:center;max-width:280px;line-height:1.3}
+.ld-sys{font-size:8px;color:#444;letter-spacing:2px;text-transform:uppercase}
+.ld-bar{width:180px;height:2px;background:rgba(255,255,255,.06);
+  border-radius:2px;overflow:hidden}
+.ld-fill{height:100%;background:linear-gradient(90deg,#ff6b35,#ff6b3588,#ff6b35);
+  background-size:200%;animation:bs 1.4s linear infinite}
+@keyframes bs{0%{background-position:100%}100%{background-position:-100%}}
+.ld-tip{font-size:9px;color:#333;text-align:center;max-width:240px;line-height:1.5}
+
+/* Progress bar (for fetching ROM) */
+#fetchBar{width:180px;display:none}
+#fetchBar .fb-label{font-size:9px;color:#555;margin-bottom:4px;text-align:center}
+#fetchBar .fb-track{height:3px;background:rgba(255,255,255,.06);border-radius:3px;overflow:hidden}
+#fetchBar .fb-fill{height:100%;background:#ff6b35;border-radius:3px;width:0%;transition:width .1s}
+
+/* Error overlay */
+#errBox{position:absolute;inset:0;z-index:30;background:#07071c;
+  display:none;flex-direction:column;align-items:center;justify-content:center;
+  gap:11px;padding:24px;text-align:center}
+.err-ico{font-size:46px}
+.err-t{font-size:14px;font-weight:700;color:#ff4466}
+.err-m{font-size:11px;color:#555;max-width:300px;line-height:1.7;word-break:break-word}
+.err-btn{padding:9px 20px;border-radius:9px;border:none;font-size:13px;
+  font-weight:700;cursor:pointer;color:#fff;margin-top:4px}
+.err-btn.pri{background:linear-gradient(135deg,#ff6b35,#ff6b3588)}
+.err-btn.sec{background:rgba(255,255,255,.08)}
+</style>
+</head>
+<body>
+<div id="shell">
+  <div class="bar">
+    <a class="back" href="../../arcade-vault.html">‹</a>
+    <div class="info">
+      <div class="info-name" id="gameName">—</div>
+      <div class="info-sys">PC Engine · PC Engine / TurboGrafx-16</div>
+    </div>
+    <div class="as-ind on" id="asInd"><div class="as-dot"></div><span>AUTO</span></div>
+    <div class="btns">
+      <button class="btn" id="btnSave" onclick="doSave()">💾</button>
+      <button class="btn" onclick="doLoad()">📂</button>
+      <button class="btn" onclick="doFS()">⛶</button>
+    </div>
+  </div>
+
+  <div id="gameArea">
+    <div id="game"></div>
+
+    <!-- LOADER -->
+    <div id="loader">
+      <div class="ld-ico">🕹️</div>
+      <div class="ld-sys">PC Engine · 1987</div>
+      <div class="ld-name" id="ldName">جاري التحميل...</div>
+      <div id="fetchBar">
+        <div class="fb-label" id="fetchLabel">جاري تحميل الروم...</div>
+        <div class="fb-track"><div class="fb-fill" id="fetchFill"></div></div>
+      </div>
+      <div class="ld-bar"><div class="ld-fill"></div></div>
+
+      <div class="ld-tip" id="ldTip">جاري تهيئة النواة...</div>
+    </div>
+
+    <!-- ERROR -->
+    <div id="errBox">
+      <div class="err-ico">⚠️</div>
+      <div class="err-t" id="errTitle">حدث خطأ</div>
+      <div class="err-m"  id="errMsg">...</div>
+      <button class="err-btn pri" onclick="location.reload()">↺ إعادة المحاولة</button>
+      <button class="err-btn sec" onclick="history.back()">← رجوع</button>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+/* ─── Constants ─── */
+const SYS_ID   = 'pce';
+const SYS_CORE = 'pce';
+const SYS_COL  = '#ff6b35';
+const BIOS_FILES = [];
+
+/* ─── URL Params ─── */
+const P       = new URLSearchParams(location.search);
+const romFile = P.get('rom')  || '';          // e.g. "Mario.nes"
+const romName = decodeURIComponent(P.get('name') || 'لعبة');
+
+/* ─── Shared settings from vault ─── */
+let ejsPath  = localStorage.getItem('av6ejs') || 'https://cdn.emulatorjs.org/latest/data/';
+if (!ejsPath.endsWith('/')) ejsPath += '/';
+let autoSave = localStorage.getItem('av6as') !== 'false';
+
+/* ─── UI refs ─── */
+const $ = id => document.getElementById(id);
+$('gameName').textContent = romName;
+$('ldName').textContent   = romName;
+$('asInd').className      = 'as-ind' + (autoSave ? ' on' : '');
+
+/* ─── Auto-save timer ─── */
+let asTimer = null;
+function startAS() {
+  clearAS();
+  if (!autoSave) return;
+  asTimer = setInterval(() => {
+    try { EJS_emulator.gameManager.saveState(0); } catch(e) {}
+  }, 60000);
+}
+function clearAS() { if (asTimer) { clearInterval(asTimer); asTimer = null; } }
+
+/* ─── Controls ─── */
+function doSave() {
+  try { EJS_emulator.gameManager.saveState(0); } catch(e) { showToast('⚠️ المحاكي لم يبدأ بعد'); }
+}
+function doLoad() {
+  try { EJS_emulator.gameManager.loadState(0); } catch(e) { showToast('⚠️ المحاكي لم يبدأ بعد'); }
+}
+function doFS() {
+  const el = $('gameArea');
+  document.fullscreenElement ? document.exitFullscreen() : el.requestFullscreen().catch(()=>{});
+}
+
+/* ─── Toast ─── */
+let _tt;
+function showToast(msg) {
+  let t = $('_toast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = '_toast';
+    Object.assign(t.style, {
+      position:'fixed', bottom:'12px', left:'50%',
+      transform:'translateX(-50%) translateY(8px)',
+      background:'rgba(8,8,30,.97)', border:'1px solid rgba(136,0,255,.3)',
+      color:'#fff', padding:'8px 16px', borderRadius:'28px', fontSize:'12px',
+      fontWeight:'600', zIndex:'999', opacity:'0', transition:'all .22s',
+      whiteSpace:'nowrap', backdropFilter:'blur(10px)', pointerEvents:'none',
+      boxShadow:'0 4px 20px rgba(0,0,0,.5)', maxWidth:'86vw', textAlign:'center'
+    });
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.style.opacity = '1';
+  t.style.transform = 'translateX(-50%) translateY(0)';
+  clearTimeout(_tt);
+  _tt = setTimeout(() => {
+    t.style.opacity = '0';
+    t.style.transform = 'translateX(-50%) translateY(8px)';
+  }, 2600);
+}
+
+/* ─── Error display ─── */
+function showErr(title, msg) {
+  $('loader').style.display   = 'none';
+  $('errBox').style.display   = 'flex';
+  $('errTitle').textContent   = title;
+  $('errMsg').textContent     = msg;
+}
+
+/* ─── Fetch with progress ─── */
+async function fetchWithProgress(url, label) {
+  const fb = $('fetchBar');
+  const fl = $('fetchLabel');
+  const ff = $('fetchFill');
+  fb.style.display = 'block';
+  if (fl) fl.textContent = label || 'جاري التحميل...';
+
+  const resp = await fetch(url);
+  if (!resp.ok) throw new Error('HTTP ' + resp.status + ' — ' + url);
+
+  const total = Number(resp.headers.get('Content-Length') || 0);
+  const reader = resp.body.getReader();
+  const chunks = [];
+  let received = 0;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    received += value.length;
+    if (total && ff) ff.style.width = Math.round(received / total * 100) + '%';
+  }
+
+  if (ff) ff.style.width = '100%';
+  fb.style.display = 'none';
+
+  const all = new Uint8Array(received);
+  let pos = 0;
+  for (const c of chunks) { all.set(c, pos); pos += c.length; }
+  return all.buffer;
+}
+
+/* ─── BIOS detection ─── */
+async function findBios() {
+  for (const bf of BIOS_FILES) {
+    try {
+      const r = await fetch('bios/' + bf, { method: 'HEAD' });
+      if (r.ok) return 'bios/' + bf;
+    } catch(e) {}
+  }
+  return '';
+}
+
+async function applyCustomBios() {
+  const url = $('biosCustom') ? $('biosCustom').value.trim() : '';
+  if (!url) return;
+  window._customBios = url;
+  const bs = $('biosStatus');
+  if (bs) { bs.textContent = '✅ BIOS مخصص: ' + url.split('/').pop(); bs.style.color = '#00ffaa'; }
+  showToast('✅ سيُطبَّق BIOS عند إعادة التشغيل');
+}
+
+/* ─── MAIN BOOT ─── */
+let romBlobUrl = null;
+
+async function boot() {
+  if (!romFile) {
+    showErr('خطأ في المعاملات', 'لم يتم تحديد ملف اللعبة. افتح اللعبة من الصفحة الرئيسية.');
+    return;
+  }
+
+  $('ldTip').textContent = 'جاري تحميل الروم من الخادم...';
+
+  /* 1. Fetch ROM with progress */
+  let romBuffer;
+  try {
+    romBuffer = await fetchWithProgress('roms/' + romFile, 'جاري تحميل: ' + romFile);
+  } catch(e) {
+    showErr(
+      'فشل تحميل الروم',
+      'تعذّر قراءة الملف: roms/' + romFile + '\n\n' + e.message +
+      '\n\nتأكد من وجود الملف في مجلد roms/ واضغط تحديث roms.json من الصفحة الرئيسية.'
+    );
+    return;
+  }
+
+  const romBlob   = new Blob([romBuffer]);
+  romBlobUrl      = URL.createObjectURL(romBlob);
+
+  /* 2. Find BIOS */
+  $('ldTip').textContent = 'جاري البحث عن BIOS...';
+  let biosUrl = window._customBios || '';
+  if (!biosUrl) biosUrl = await findBios();
+
+  /* Update BIOS status UI */
+  const bs = $('biosStatus');
+  if (bs) {
+    if (biosUrl) {
+      bs.textContent = '✅ تم العثور على BIOS: ' + biosUrl.split('/').pop();
+      bs.style.color  = '#00ffaa';
+    } else if (BIOS_FILES.length > 0) {
+      bs.textContent = '⚠️ لم يُعثر على BIOS في مجلد bios/ — بعض الألعاب لن تعمل';
+      bs.style.color  = '#ff8844';
+    }
+  }
+
+  /* 3. Setup EmulatorJS */
+  $('ldTip').textContent = 'جاري تحميل نواة ' + SYS_CORE + '...';
+
+  window.EJS_player          = '#game';
+  window.EJS_gameName        = romName;
+  window.EJS_gameUrl         = romBlobUrl;
+  window.EJS_core            = SYS_CORE;
+  window.EJS_pathtodata      = ejsPath;
+  window.EJS_biosUrl         = biosUrl;
+  window.EJS_startOnLoaded   = true;
+  window.EJS_color           = SYS_COL;
+  window.EJS_backgroundColor = '#000000';
+  window.EJS_defaultOptions  = {
+    'save-state-slot': '1',
+    'save-state-location': 'keep in browser'
+  };
+  window.EJS_Buttons = {
+    playPause: true, restart: true, mute: true, settings: true,
+    fullscreen: true, saveState: true, loadState: true,
+    gamepad: true, volume: true, saveSavFiles: true,
+    loadSavFiles: true, screenshot: true,
+    screenRecord: false, cheat: false
+  };
+
+  window.EJS_onGameStart = function() {
+    $('loader').classList.add('gone');
+    startAS();
+  };
+
+  window.EJS_onSaveState = function() {
+    const b = $('btnSave');
+    b.classList.add('ok'); b.textContent = '✅';
+    setTimeout(() => { b.classList.remove('ok'); b.textContent = '💾'; }, 2000);
+  };
+
+  window.EJS_onLoadState = function() { showToast('✅ تم تحميل الحالة'); };
+
+  window.EJS_onLoadError = function() {
+    showErr(
+      'فشل تحميل نواة المحاكي',
+      'النواة: ' + SYS_CORE + '\nمسار EmulatorJS: ' + ejsPath +
+      '\n\nتحقق من اتصال الإنترنت، أو غيّر مسار EmulatorJS في الإعدادات للعمل Offline.'
+    );
+  };
+
+  /* 4. Load EJS loader script */
+  const sc = document.createElement('script');
+  sc.src = ejsPath + 'loader.js';
+  sc.onerror = function() {
+    showErr(
+      'فشل تحميل loader.js',
+      'المسار: ' + ejsPath + 'loader.js' +
+      '\n\nتحقق من اتصال الإنترنت أو غيّر مسار EmulatorJS في إعدادات التطبيق.'
+    );
+  };
+  document.body.appendChild(sc);
+
+  /* Fallback: hide loader after 40s if EJS_onGameStart didn't fire */
+  setTimeout(() => $('loader').classList.add('gone'), 40000);
+}
+
+/* ─── Kick off ─── */
+boot();
+
+/* ─── Keyboard ─── */
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && document.fullscreenElement) document.exitFullscreen();
+});
+document.addEventListener('contextmenu', e => e.preventDefault());
+</script>
+</body>
+</html>

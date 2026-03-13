@@ -1,0 +1,4 @@
+الملفات المطلوبة:
+lynxboot.img
+
+يتطلب ملف BIOS — ضع lynxboot.img في بايوس

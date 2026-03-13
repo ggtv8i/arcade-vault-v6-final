@@ -1,0 +1,6 @@
+الملفات المطلوبة:
+bios_CD_U.bin
+bios_CD_E.bin
+bios_CD_J.bin
+
+يتطلب ملف BIOS — ضعه في مجلد bios/

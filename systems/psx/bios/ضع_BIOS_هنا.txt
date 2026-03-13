@@ -1,0 +1,6 @@
+الملفات المطلوبة:
+scph1001.bin
+scph5501.bin
+scph7001.bin
+
+يتطلب ملف BIOS — ضع scph1001.bin في مجلد bios/
